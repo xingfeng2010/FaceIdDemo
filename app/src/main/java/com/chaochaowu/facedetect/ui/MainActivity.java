@@ -93,17 +93,23 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
     private FaceIdHandler mHandler = new FaceIdHandler();
 
     class FaceIdHandler extends Handler {
-        private int count;
+        //上传图片数量限制
+        private static final int PIC_NUM_LIMIT = 15;
+        private int count = 0;
+        private String[] array = new String[PIC_NUM_LIMIT];
 
         @Override
         public void handleMessage(Message msg) {
             count ++;
-            if (count >= 15) {
-                count = 0;
+            if (count >= PIC_NUM_LIMIT) {
                 byte[] data = (byte[]) msg.obj;
                 Bitmap bitmap = nv21ToBitmap(data, mCameraPreviewWidth, mCameraPreviewHeight);
                 mAdapter.setPhoto(bitmap);
                 mPresenter.getDetectResultFromServer(bitmap);
+                String image64 = Utils.base64(bitmap);
+                array[count] = image64;
+                //调用地平线接口传arra数组。
+                count = 0;
             }
         }
     }
