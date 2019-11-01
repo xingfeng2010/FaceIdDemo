@@ -2,6 +2,7 @@ package com.chaochaowu.facedetect.ui;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -11,17 +12,20 @@ import android.graphics.Rect;
 import android.graphics.YuvImage;
 import android.hardware.Camera;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -31,6 +35,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
+import com.chaochaowu.facedetect.HorizonSigner;
+import com.chaochaowu.facedetect.ParamBean;
 import com.chaochaowu.facedetect.PermissionUtils;
 import com.chaochaowu.facedetect.adapter.FacesInfoAdapter;
 import com.chaochaowu.facedetect.eventbus.FaceEvent;
@@ -41,6 +47,7 @@ import com.chaochaowu.facedetect.dagger.DaggerMainActivityComponent;
 import com.chaochaowu.facedetect.dagger.MainPresenterModule;
 import com.gc.materialdesign.views.ButtonRectangle;
 import com.gc.materialdesign.views.ProgressBarCircularIndeterminate;
+import com.google.gson.Gson;
 
 import org.greenrobot.eventbus.EventBus;
 
@@ -51,12 +58,24 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Random;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 import javax.inject.Inject;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.FormBody;
+import okhttp3.HttpUrl;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 /**
  * 主界面
@@ -92,6 +111,8 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
     private int mCameraPreviewWidth, mCameraPreviewHeight;
     private FaceIdHandler mHandler = new FaceIdHandler();
 
+    private Context mContext;
+
     class FaceIdHandler extends Handler {
         //上传图片数量限制
         private static final int PIC_NUM_LIMIT = 15;
@@ -100,20 +121,105 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
 
         @Override
         public void handleMessage(Message msg) {
-            count ++;
-            if (count >= PIC_NUM_LIMIT) {
-                byte[] data = (byte[]) msg.obj;
+            count++;
+            byte[] data = (byte[]) msg.obj;
+
+            if (count <= PIC_NUM_LIMIT - 1) {
                 Bitmap bitmap = nv21ToBitmap(data, mCameraPreviewWidth, mCameraPreviewHeight);
-                mAdapter.setPhoto(bitmap);
-                mPresenter.getDetectResultFromServer(bitmap);
                 String image64 = Utils.base64(bitmap);
                 array[count] = image64;
+                mAdapter.setPhoto(bitmap);
+            }
+
+            if (count == PIC_NUM_LIMIT - 1) {
+                //mPresenter.getDetectResultFromServer(bitmap);
+                String[] temparray = new String[PIC_NUM_LIMIT];
+                for(int  i =0; i < temparray.length; i ++) {
+                    temparray[i] = array[i];
+                }
+                testDipingxianApi(temparray);
                 //调用地平线接口传arra数组。
                 count = 0;
             }
         }
     }
 
+
+    private static final String URL = "https://faceid-pre.horizon.ai/faceid/v1/faces/98bea9445db9992e4b5d16da/car_connect_98bea9445db9992e4b5d16da_5dba4f0bbbc3c70008a832d4_/faces";
+    private Random random = new Random();
+
+    public long nextLong(Random rng, long n) {
+        // error checking and 2^x checking removed for simplicity.
+        long bits, val;
+        do {
+            bits = (rng.nextLong() << 1) >>> 1;
+            val = bits % n;
+        } while (bits - val + (n - 1) < 0L);
+        return val;
+    }
+
+    private void testDipingxianApi(String[] array) {
+        String authString = sign(HorizonSigner.HTTP_METHOD_POST, "/faceid/v1/faces/faces");
+        Log.i("DEBUG_TEST", "authString:" + authString);
+
+        HttpUrl.Builder urlBuilder = HttpUrl.parse(URL).newBuilder();
+        urlBuilder.setQueryParameter("authorization", authString);
+
+        ParamBean.ImageBean[] imgArr = new ParamBean.ImageBean[array.length];
+        for (int i = 0; i < array.length; i++) {
+            ParamBean.ImageBean bean = new ParamBean.ImageBean();
+            bean.image_type = 1;
+            bean.image_base64 = array[i];
+            imgArr[i] = bean;
+        }
+
+        ParamBean paramBean = new ParamBean();
+        paramBean.msg_id = 333333333;
+        paramBean.images = imgArr;
+        paramBean.client_type = 1;
+        paramBean.device_id = "test_00001";
+        paramBean.distance_threshold = "1e-5";
+
+
+        Log.i("DEBUG_TEST", "urlBuilder:" + urlBuilder.build());
+        String param = new Gson().toJson(paramBean);
+        OkHttpClient okHttpClient = new OkHttpClient();//创建OkHttpClient对象。
+        RequestBody body = RequestBody.create(MediaType.parse("application/json"), param);
+        Request request = new Request.Builder()
+                .url(urlBuilder.build())
+                .post(body)
+                .build();
+
+
+        okHttpClient.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                Log.i("DEBUG_TEST", "e:" + e);
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                Log.i("DEBUG_TEST", "onResponse:" + response.body().string());
+            }
+        });
+    }
+
+
+    private HorizonSigner mHorizonSigner;
+
+    private String sign(String httpMethod, String httpApi) {
+        try {
+            SortedMap<String, String> headers = new TreeMap<String, String>();
+            SortedMap<String, String> params = new TreeMap<String, String>();
+            headers.put("content-type", "application/json");
+            headers.put("host", String.valueOf(9600));
+            return mHorizonSigner.Sign(httpMethod, httpApi, params, headers);
+        } catch (Exception e) {
+            Log.e(TAG, "sign exception:" + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -141,6 +247,12 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
                 .permission.WRITE_EXTERNAL_STORAGE}, REQUEST_CODE, this);
 
         imageView.getHolder().addCallback(this);
+
+        mContext = this;
+
+        String ak = "tIvZrJMe11Ao0DWvJYtzobHQ";
+        String sk = "NoA6fSVxiknDT7YkS4xnF59GMJyHNU00";
+        mHorizonSigner = new HorizonSigner(ak, sk);
     }
 
     @OnClick(R.id.button)
@@ -312,6 +424,25 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
             e.printStackTrace();
         }
         return bitmap;
+    }
+
+    /**
+     * @param context
+     * @return 获取唯一标示
+     */
+    public String deviceID(Context context) {
+        String deviceid = "";
+
+        int permission2 = ActivityCompat.checkSelfPermission(mContext,
+                android.Manifest.permission.READ_PHONE_STATE);
+        if (permission2 != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(MainActivity.this, new String[]{}, 0x0010);
+            return deviceid;
+        }
+        TelephonyManager tm = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
+        String szImei = tm.getDeviceId();
+        String sn = tm.getSimSerialNumber();
+        return sn + szImei;
     }
 }
 
