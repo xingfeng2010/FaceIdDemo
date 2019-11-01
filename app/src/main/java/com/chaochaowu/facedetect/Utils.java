@@ -8,10 +8,13 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.media.ExifInterface;
+import android.os.Environment;
 import android.util.Base64;
 import android.util.Log;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 
 /**
@@ -33,6 +36,7 @@ public class Utils {
 
         Matrix matrix = new Matrix();
         matrix.postScale(scaleWidth, scaleHeight);
+        matrix.setRotate(90);
         Bitmap resizedBitmap = Bitmap.createBitmap(BitmapOrg, 0, 0, width,
                 height, matrix, true);
         return resizedBitmap;
@@ -120,4 +124,23 @@ public class Utils {
         return returnBm;
     }
 
+    private static final String FILE_FORMAT = ".jpg";
+    private static final String PIC_PATH = Environment.getExternalStorageDirectory().getAbsolutePath();
+
+    public static File saveBitmapToFile(Bitmap bitmap, String path) {
+        File sysFile = new File(PIC_PATH);
+        File filePic = new File(sysFile, path + FILE_FORMAT);
+
+        if (filePic.exists()) {
+            filePic.delete();
+        }
+        try {
+            FileOutputStream out = new FileOutputStream(filePic);
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
+        } catch (Exception e) {
+
+        }
+
+        return filePic;
+    }
 }
