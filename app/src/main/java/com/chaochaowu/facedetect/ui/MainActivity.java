@@ -26,6 +26,8 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.telephony.TelephonyManager;
+import android.text.TextUtils;
+import android.util.Base64;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -134,7 +136,7 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
             if (count == PIC_NUM_LIMIT - 1) {
                 //mPresenter.getDetectResultFromServer(bitmap);
                 String[] temparray = new String[PIC_NUM_LIMIT];
-                for(int  i =0; i < temparray.length; i ++) {
+                for(int  i = 0; i < temparray.length; i ++) {
                     temparray[i] = array[i];
                 }
                 testDipingxianApi(temparray);
@@ -160,28 +162,25 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
 
     private void testDipingxianApi(String[] array) {
         String authString = sign(HorizonSigner.HTTP_METHOD_POST, "/faceid/v1/faces/faces");
-        Log.i("DEBUG_TEST", "authString:" + authString);
 
         HttpUrl.Builder urlBuilder = HttpUrl.parse(URL).newBuilder();
         urlBuilder.setQueryParameter("authorization", authString);
 
-        ParamBean.ImageBean[] imgArr = new ParamBean.ImageBean[array.length];
-        for (int i = 0; i < array.length; i++) {
+        ParamBean.ImageBean[] imgArr = new ParamBean.ImageBean[array.length - 1];
+        for (int i = 1; i < array.length; i++) {
             ParamBean.ImageBean bean = new ParamBean.ImageBean();
             bean.image_type = 1;
             bean.image_base64 = array[i];
-            imgArr[i] = bean;
+            imgArr[i - 1] = bean;
         }
 
         ParamBean paramBean = new ParamBean();
-        paramBean.msg_id = 333333333;
+        paramBean.msg_id = random.nextLong();
         paramBean.images = imgArr;
         paramBean.client_type = 1;
         paramBean.device_id = "test_00001";
         paramBean.distance_threshold = "1e-5";
 
-
-        Log.i("DEBUG_TEST", "urlBuilder:" + urlBuilder.build());
         String param = new Gson().toJson(paramBean);
         OkHttpClient okHttpClient = new OkHttpClient();//创建OkHttpClient对象。
         RequestBody body = RequestBody.create(MediaType.parse("application/json"), param);
@@ -253,6 +252,21 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
         String ak = "tIvZrJMe11Ao0DWvJYtzobHQ";
         String sk = "NoA6fSVxiknDT7YkS4xnF59GMJyHNU00";
         mHorizonSigner = new HorizonSigner(ak, sk);
+    }
+
+    @Override
+    protected void onPostResume() {
+        super.onPostResume();
+
+        Bitmap bitmap = BitmapFactory.decodeResource(this.getResources(),R.drawable.timg);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
+        byte[] bytes = baos.toByteArray();
+        String base64 = Base64.encodeToString(bytes, Base64.NO_WRAP);
+
+        String[] array = new String[]{base64, base64};
+
+        testOnePicApi(array);
     }
 
     @OnClick(R.id.button)
@@ -443,6 +457,49 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
         String szImei = tm.getDeviceId();
         String sn = tm.getSimSerialNumber();
         return sn + szImei;
+    }
+
+    private void testOnePicApi(String[] array) {
+        String authString = sign(HorizonSigner.HTTP_METHOD_POST, "/faceid/v1/faces/faces");
+
+        HttpUrl.Builder urlBuilder = HttpUrl.parse(URL).newBuilder();
+        urlBuilder.setQueryParameter("authorization", authString);
+
+        ParamBean.ImageBean[] imgArr = new ParamBean.ImageBean[array.length - 1];
+        for (int i = 1; i < array.length; i++) {
+            ParamBean.ImageBean bean = new ParamBean.ImageBean();
+            bean.image_type = 1;
+            bean.image_base64 = array[i];
+            imgArr[i - 1] = bean;
+        }
+
+        ParamBean paramBean = new ParamBean();
+        paramBean.msg_id = random.nextLong();
+        paramBean.images = imgArr;
+        paramBean.client_type = 1;
+        paramBean.device_id = "test_00001";
+        paramBean.distance_threshold = "1e-5";
+
+        String param = new Gson().toJson(paramBean);
+        OkHttpClient okHttpClient = new OkHttpClient();//创建OkHttpClient对象。
+        RequestBody body = RequestBody.create(MediaType.parse("application/json"), param);
+        Request request = new Request.Builder()
+                .url(urlBuilder.build())
+                .post(body)
+                .build();
+
+
+        okHttpClient.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                Log.i("DEBUG_TEST", "e:" + e);
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                Log.i("DEBUG_TEST", "onResponse:" + response.body().string());
+            }
+        });
     }
 }
 
