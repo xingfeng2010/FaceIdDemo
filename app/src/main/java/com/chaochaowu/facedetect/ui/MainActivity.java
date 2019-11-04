@@ -117,7 +117,7 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
 
     class FaceIdHandler extends Handler {
         //上传图片数量限制
-        private static final int PIC_NUM_LIMIT = 15;
+        private static final int PIC_NUM_LIMIT = 5;
         private int count = 0;
         private String[] array = new String[PIC_NUM_LIMIT];
 
@@ -393,6 +393,8 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
             Camera.Size mCameraPreviewSize = parms.getPreviewSize();
             mCameraPreviewWidth = mCameraPreviewSize.width;
             mCameraPreviewHeight = mCameraPreviewSize.height;
+            Log.i("DEBUG_TEST", "mCameraPreviewWidth:" + mCameraPreviewWidth);
+            Log.i("DEBUG_TEST", "mCameraPreviewHeight:" + mCameraPreviewHeight);
             mCamera.setPreviewDisplay(holder);
             mCamera.setDisplayOrientation(90);
             mCamera.setPreviewCallback(new CustomPreviewCallback());
