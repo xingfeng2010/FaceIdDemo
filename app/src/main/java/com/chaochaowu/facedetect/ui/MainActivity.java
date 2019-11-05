@@ -38,6 +38,7 @@ import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
 import com.chaochaowu.facedetect.HorizonSigner;
+import com.chaochaowu.facedetect.LiveDetectParam;
 import com.chaochaowu.facedetect.ParamBean;
 import com.chaochaowu.facedetect.PermissionUtils;
 import com.chaochaowu.facedetect.adapter.FacesInfoAdapter;
@@ -55,6 +56,8 @@ import org.greenrobot.eventbus.EventBus;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -136,16 +139,91 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
             if (count == PIC_NUM_LIMIT - 1) {
                 //mPresenter.getDetectResultFromServer(bitmap);
                 String[] temparray = new String[PIC_NUM_LIMIT];
-                for(int  i = 0; i < temparray.length; i ++) {
+                for (int i = 0; i < temparray.length; i++) {
                     temparray[i] = array[i];
                 }
-                testDipingxianApi(temparray);
+//                testDipingxianApi(temparray);
+                testLiveDetect();
                 //调用地平线接口传arra数组。
-                count = 0;
+//                count = 0;
             }
         }
     }
 
+    private static final String LIVE_DETECT_URL = "https://faceid-pre.horizon.ai/faceid/v1/face/live_detect";
+    private void testLiveDetect() {
+        Log.i("DEBUG_TEST", "testLiveDetect call");
+        String path = Environment.getExternalStorageDirectory().getAbsolutePath() + "/CameraKitDemo0.13/Full/_2019-11-05-132724_Full.mp4";
+//        String path = Environment.getExternalStorageDirectory().getAbsolutePath() + "/test2.mp4";
+
+        String base64 = file2Base64(path);
+
+        String authString = sign(HorizonSigner.HTTP_METHOD_POST, "/faceid/v1/face/live_detect");
+
+        HttpUrl.Builder urlBuilder = HttpUrl.parse(LIVE_DETECT_URL).newBuilder();
+        urlBuilder.setQueryParameter("authorization", authString);
+
+
+        LiveDetectParam paramBean = new LiveDetectParam();
+        paramBean.msg_id = random.nextLong();
+        paramBean.video_type = 1;
+        paramBean.client_type = 1;
+        paramBean.video_base64 = base64;
+        paramBean.app_id = "98bea9445db9992e4b5d16da";
+        paramBean.client_type = 1;
+        paramBean.device_id = "test_00001";
+        paramBean.group_id = "car_connect_98bea9445db9992e4b5d16da_5db999d098bea90008f7774d_";
+
+
+        String param = new Gson().toJson(paramBean);
+        OkHttpClient okHttpClient = new OkHttpClient();//创建OkHttpClient对象。
+        RequestBody body = RequestBody.create(MediaType.parse("application/json"), param);
+        Request request = new Request.Builder()
+                .url(urlBuilder.build())
+                .post(body)
+                .build();
+
+
+        okHttpClient.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                Log.i("DEBUG_TEST", "00 e:" + e);
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                Log.i("DEBUG_TEST", "00 onResponse:" + response.body().string());
+            }
+        });
+    }
+
+
+    /**
+     * 文件转Base64.
+     *
+     * @param filePath
+     * @return
+     */
+    public static String file2Base64(String filePath) {
+        FileInputStream objFileIS = null;
+        try {
+            objFileIS = new FileInputStream(filePath);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        ByteArrayOutputStream objByteArrayOS = new ByteArrayOutputStream();
+        byte[] byteBufferString = new byte[1024];
+        try {
+            for (int readNum; (readNum = objFileIS.read(byteBufferString)) != -1; ) {
+                objByteArrayOS.write(byteBufferString, 0, readNum);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        String videodata = Base64.encodeToString(objByteArrayOS.toByteArray(), Base64.NO_WRAP);
+        return videodata;
+    }
 
     private static final String URL = "https://faceid-pre.horizon.ai/faceid/v1/faces/98bea9445db9992e4b5d16da/car_connect_98bea9445db9992e4b5d16da_5dba4f0bbbc3c70008a832d4_/faces";
     private Random random = new Random();
@@ -161,6 +239,7 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
     }
 
     private void testDipingxianApi(String[] array) {
+        Log.i("DEBUG_TEST", "testDipingxianApi call");
         String authString = sign(HorizonSigner.HTTP_METHOD_POST, "/faceid/v1/faces/faces");
 
         HttpUrl.Builder urlBuilder = HttpUrl.parse(URL).newBuilder();
@@ -193,12 +272,12 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
         okHttpClient.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
-                Log.i("DEBUG_TEST", "e:" + e);
+                Log.i("DEBUG_TEST", "11 e:" + e);
             }
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                Log.i("DEBUG_TEST", "onResponse:" + response.body().string());
+                Log.i("DEBUG_TEST", "11 onResponse:" + response.body().string());
             }
         });
     }
@@ -258,7 +337,7 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
     protected void onPostResume() {
         super.onPostResume();
 
-        Bitmap bitmap = BitmapFactory.decodeResource(this.getResources(),R.drawable.timg);
+        Bitmap bitmap = BitmapFactory.decodeResource(this.getResources(), R.drawable.timg);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
         byte[] bytes = baos.toByteArray();
@@ -266,7 +345,7 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
 
         String[] array = new String[]{base64, base64};
 
-        testOnePicApi(array);
+//        testOnePicApi(array);
     }
 
     @OnClick(R.id.button)
