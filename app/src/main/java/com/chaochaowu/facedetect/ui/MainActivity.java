@@ -142,8 +142,8 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
                 for (int i = 0; i < temparray.length; i++) {
                     temparray[i] = array[i];
                 }
-//                testDipingxianApi(temparray);
-                testLiveDetect();
+                testDipingxianApi(temparray);
+//                testLiveDetect();
                 //调用地平线接口传arra数组。
 //                count = 0;
             }
@@ -519,25 +519,6 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
             e.printStackTrace();
         }
         return bitmap;
-    }
-
-    /**
-     * @param context
-     * @return 获取唯一标示
-     */
-    public String deviceID(Context context) {
-        String deviceid = "";
-
-        int permission2 = ActivityCompat.checkSelfPermission(mContext,
-                android.Manifest.permission.READ_PHONE_STATE);
-        if (permission2 != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(MainActivity.this, new String[]{}, 0x0010);
-            return deviceid;
-        }
-        TelephonyManager tm = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
-        String szImei = tm.getDeviceId();
-        String sn = tm.getSimSerialNumber();
-        return sn + szImei;
     }
 
     private void testOnePicApi(String[] array) {
