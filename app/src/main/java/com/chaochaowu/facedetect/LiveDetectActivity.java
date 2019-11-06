@@ -1,13 +1,16 @@
 package com.chaochaowu.facedetect;
 
+import android.media.MediaRecorder;
 import android.os.Environment;
 import android.os.Handler;
+import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.gson.Gson;
@@ -48,7 +51,15 @@ public class LiveDetectActivity extends AppCompatActivity {
     private Button btnStartRec, btnStopRec;
 
     private String recordingVideoFilePath;
-    private Handler handler = new Handler();
+    private Handler handler = new Handler() {
+
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+
+            startRecord();
+        }
+    };
 
     private Long liveDetectTime;
     private Long liveApiTime;
@@ -56,13 +67,17 @@ public class LiveDetectActivity extends AppCompatActivity {
     private Long picRegisterTime;
     private Long picApiTime;
 
+    private TextView check_result;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_live_detect);
         cameraView = (CameraView) findViewById(R.id.camera);
+        check_result = (TextView) findViewById(R.id.check_result);
+
         cameraView.setFacing(CameraKit.Constants.FACING_FRONT);
-        cameraView.setVideoBitRate(640);
+        cameraView.setVideoBitRate(640 * 480 * 15);
         cameraView.setVideoQuality(CameraKit.Constants.VIDEO_QUALITY_480P);
 
         btnStartRec = findViewById(R.id.btn_start_rec);
@@ -93,18 +108,22 @@ public class LiveDetectActivity extends AppCompatActivity {
         public void onClick(View v) {
             btnStartRec.setVisibility(View.GONE);
             btnStopRec.setVisibility(View.VISIBLE);
-            File videoFile = getRecordingVideoFilePath();
-            recordingVideoFilePath = videoFile.getAbsolutePath();
-            cameraView.captureVideo(videoFile, new CameraKitEventCallback<CameraKitVideo>() {
-                @Override
-                public void callback(CameraKitVideo cameraKitVideo) {
-
-                    Log.e("Rec Video Path", cameraKitVideo.getVideoFile().getAbsolutePath());
-                }
-            });
-
+            startRecord();
         }
     };
+
+    private void startRecord() {
+        File videoFile = getRecordingVideoFilePath();
+        recordingVideoFilePath = videoFile.getAbsolutePath();
+        //recordingVideoFilePath = new File(Environment.getExternalStorageDirectory() + "/FaceIdDemo", "/" + "Full" + "/" + "1573007586683.mp4").getAbsolutePath();
+        cameraView.captureVideo(videoFile, 1000, new CameraKitEventCallback<CameraKitVideo>() {
+            @Override
+            public void callback(CameraKitVideo cameraKitVideo) {
+                Log.i("DEBUG_TEST", "视频录制完成：" + recordingVideoFilePath);
+                testLiveDetect(recordingVideoFilePath);
+            }
+        });
+    }
 
     private View.OnClickListener stopRecOnClickListener = new View.OnClickListener() {
         @Override
@@ -118,6 +137,7 @@ public class LiveDetectActivity extends AppCompatActivity {
     };
 
     public File getRecordingVideoFilePath() {
+        MediaRecorder mMediaRecorder;
         File mediaStorageDir = new File(Environment.getExternalStorageDirectory() + "/FaceIdDemo", "/" + "Full");
 
         // Create the storage directory if it does not exist
@@ -189,9 +209,15 @@ public class LiveDetectActivity extends AppCompatActivity {
                         String base64 = live_result.optString("best_frame_base64");
                         testDipingxianApi(new String[]{base64, base64});
                         Log.i("DEBUG_TEST", "活体检测成功！！");
+                        showToast("活体检测成功");
+                    } else if (code == 140807) {
+                        Log.i("DEBUG_TEST", "没检测到人脸");
+                        showToast("没检测到人脸");
+                        handler.sendEmptyMessage(1);
                     } else {
                         Log.i("DEBUG_TEST", "活体检测失败！！");
                         showToast("活体检测失败");
+                        handler.sendEmptyMessage(1);
                     }
                 } catch (JSONException e) {
                     e.printStackTrace();
@@ -287,13 +313,14 @@ public class LiveDetectActivity extends AppCompatActivity {
                 Log.i("DEBUG_TEST", "注册接口调用-->返回时间：" + (System.currentTimeMillis() - picApiTime));
                 Log.i("DEBUG_TEST", "视频-->活检完成-->注册完成总的时间：" + (System.currentTimeMillis() - liveDetectTime));
                 String plainText = response.body().string();
-                Log.i("DEBUG_TEST", ": "+plainText);
+                Log.i("DEBUG_TEST", ": " + plainText);
                 try {
                     JSONObject jsonObject = new JSONObject(plainText);
                     int rsp_code = jsonObject.optInt("rsp_code");
                     if (rsp_code == 0 || rsp_code == 4005) {
                         String person_id = jsonObject.optString("person_id");
                         Log.i("DEBUG_TEST", "注册成功！！");
+                        showToast("注册成功");
                     } else {
                         Log.i("DEBUG_TEST", "注册失败！！");
                         showToast("注册失败");
@@ -309,7 +336,8 @@ public class LiveDetectActivity extends AppCompatActivity {
         LiveDetectActivity.this.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                Toast.makeText(LiveDetectActivity.this, str, Toast.LENGTH_SHORT).show();
+               // Toast.makeText(LiveDetectActivity.this, str, Toast.LENGTH_SHORT).show();
+                check_result.setText(str);
             }
         });
     }
